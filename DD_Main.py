@@ -15,13 +15,13 @@ def main():
     update_processes = input("Would you like to update core processes? (yes/no): ").strip().lower()
     if update_processes == 'yes':
         store_processes()
-    data = load_data('interview_notes.xlsx')
+    data = load_data(r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\100-Unprocessed\interview_notes.xlsx")
     clean_data = clean_and_prepare(data)
     pseudonymized_data, mapping = pseudonymize(clean_data)
     analysis_results = analyze_data(pseudonymized_data)
-    store_output(analysis_results, 'local_directory/')
+    store_output(analysis_results, r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\200-Storage/")
     final_results = unpseudonymize(analysis_results)
-    store_output(final_results, 'final_outputs/')
+    store_output(final_results, r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\800-Output/")
 
 if __name__ == "__main__":
     main()
