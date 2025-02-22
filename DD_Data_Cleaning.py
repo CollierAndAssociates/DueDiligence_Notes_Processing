@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 import torch
 from transformers import pipeline
+from joblib import Parallel, delayed
 
 def clean_and_prepare(data):
     """Clean data and contextually fill missing 'Core System' and 'Core Process' values using LLM."""
@@ -57,10 +58,17 @@ def clean_and_prepare(data):
             for idx, result in zip(process_indices, process_results):
                 data.at[idx, 'Core Process'] = result['labels'][0]
 
-        # Batch classify Core System
-        for idx, notes, candidates in zip(system_indices, system_texts, system_candidates):
-            system_result = classifier(notes, candidates)
-            data.at[idx, 'Core System'] = system_result['labels'][0]
+        # Parallel classify Core System
+        def classify_system(notes, candidates):
+            result = classifier(notes, candidates)
+            return result['labels'][0]
+
+        if system_texts:
+            system_results = Parallel(n_jobs=4)(delayed(classify_system)(notes, candidates) 
+                                                for notes, candidates in zip(system_texts, system_candidates))
+            
+            for idx, result in zip(system_indices, system_results):
+                data.at[idx, 'Core System'] = result
 
         print("Data cleaned and prepared with contextual LLM filling.")
         return data
