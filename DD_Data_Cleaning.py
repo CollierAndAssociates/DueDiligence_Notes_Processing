@@ -1,6 +1,7 @@
 # DD_Data_Cleaning.py
 import pandas as pd
 import sqlite3
+import torch
 from transformers import pipeline
 
 def clean_and_prepare(data):
@@ -13,8 +14,12 @@ def clean_and_prepare(data):
         core_processes = [row[0] for row in c.fetchall()]
         conn.close()
 
+        # Check for GPU availability
+        device = 0 if torch.cuda.is_available() else -1
+        print(f"Device set to use {'GPU' if device == 0 else 'CPU'}")
+
         # Initialize NLP model for classification
-        classifier = pipeline('zero-shot-classification', model='facebook/bart-large-mnli')
+        classifier = pipeline('zero-shot-classification', model='facebook/bart-large-mnli', device=device)
 
         # Contextually fill 'Core Process' and 'Core System'
         for idx, row in data.iterrows():
