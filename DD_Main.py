@@ -1,4 +1,4 @@
-# Main.py
+# DD_Main.py
 from DD_Data_Ingestion import load_data
 from DD_Data_Cleaning import clean_and_prepare
 from DD_Term_Storage import store_terms
@@ -10,10 +10,10 @@ from DD_Unpseudonymization import unpseudonymize
 
 def main():
     update_terms = input("Would you like to update terms for pseudonymization? (yes/no): ").strip().lower()
-    if update_terms == 'yes':
+    if update_terms in ('yes', 'y'):
         store_terms()
     update_processes = input("Would you like to update core processes? (yes/no): ").strip().lower()
-    if update_processes == 'yes':
+    if update_processes in ('yes', 'y'):
         store_processes()
     data = load_data(r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\100-Unprocessed\interview_notes.xlsx")
     clean_data = clean_and_prepare(data)

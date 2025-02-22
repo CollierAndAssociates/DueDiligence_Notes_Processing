@@ -1,6 +1,7 @@
 # Unpseudonymization.py
 import json
 import sqlite3
+import hashlib
 
 def unpseudonymize(data):
     """Revert pseudonymized data back to original terms using stored terms."""
