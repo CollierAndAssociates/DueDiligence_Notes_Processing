@@ -1,12 +1,63 @@
-# DD_Data_Cleaning.py
+"""
+DD_Data_Cleaning.py
+
+This module processes raw data by filling in missing 'Core System' and 'Core Process' values
+using Natural Language Processing (NLP) techniques and contextual analysis.
+It integrates GPU acceleration when available for optimized performance.
+
+Company: [C Tech Solutions, LLC (dba Collier & Associates)]
+Author: [Andrew Collier]
+Date: [2025-02-23]
+
+Dependencies:
+    - pandas: Used for data manipulation.
+    - sqlite3: Handles local storage of predefined core processes.
+    - torch: Enables GPU acceleration for NLP tasks.
+    - transformers: Provides NLP models for classification.
+    - joblib: Facilitates parallel processing to speed up classification.
+
+Project Scope:
+    - This script is a core component of the due diligence analysis framework.
+    - It automates the classification of processes and systems based on interview notes.
+    - It improves data standardization by leveraging predefined business process classifications.
+
+Usage Example:
+    >>> df = clean_and_prepare(df)
+    Device set to use GPU
+    Data cleaned and prepared with contextual LLM filling.
+
+Configuration Steps:
+    - Ensure `processes.db` contains predefined core processes.
+    - Run this script as part of the data processing pipeline.
+    - Requires a working GPU setup for optimal NLP model performance.
+"""
+
 import pandas as pd
 import sqlite3
 import torch
 from transformers import pipeline
 from joblib import Parallel, delayed
+from typing import Optional
 
-def clean_and_prepare(data):
-    """Clean data and contextually fill missing 'Core System' and 'Core Process' values using LLM."""
+def clean_and_prepare(data: pd.DataFrame) -> Optional[pd.DataFrame]:
+    """
+    Cleans and fills missing 'Core System' and 'Core Process' values using NLP-based classification.
+
+    Args:
+        data (pd.DataFrame): The dataset containing interview notes and entity information.
+
+    Returns:
+        Optional[pd.DataFrame]: The processed DataFrame with missing values filled, or None on failure.
+
+    Raises:
+        sqlite3.Error: If there is an issue accessing the process database.
+        KeyError: If expected columns are missing from the dataset.
+
+    Example:
+        >>> df = clean_and_prepare(df)
+        Device set to use GPU
+        Data cleaned and prepared with contextual LLM filling.
+    """
     try:
         # Load core processes from database
         conn = sqlite3.connect('processes.db')
@@ -26,16 +77,11 @@ def clean_and_prepare(data):
         data['Core Process'] = data['Core Process'].astype(str)
 
         # Collect rows needing classification
-        process_indices = []
-        process_texts = []
-
-        system_indices = []
-        system_texts = []
-        system_candidates = []
+        process_indices, process_texts = [], []
+        system_indices, system_texts, system_candidates = [], [], []
 
         for idx, row in data.iterrows():
-            notes = row['Notes']
-            entity = row['Entity']
+            notes, entity = row['Notes'], row['Entity']
 
             # For Core Process
             if pd.isna(row['Core Process']) or row['Core Process'] == 'Unknown':
@@ -59,7 +105,8 @@ def clean_and_prepare(data):
                 data.at[idx, 'Core Process'] = result['labels'][0]
 
         # Parallel classify Core System
-        def classify_system(notes, candidates):
+        def classify_system(notes: str, candidates: list) -> str:
+            """Classifies Core System based on contextual interview notes."""
             result = classifier(notes, candidates)
             return result['labels'][0]
 
@@ -72,6 +119,18 @@ def clean_and_prepare(data):
 
         print("Data cleaned and prepared with contextual LLM filling.")
         return data
-    except Exception as e:
-        print(f"Error cleaning data: {e}")
+    
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
         return None
+    except KeyError as e:
+        print(f"Data error: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return None
+
+# Suggested Improvements:
+# - Implement a caching mechanism to reduce repeated NLP model calls.
+# - Optimize batch processing for improved speed in large datasets.
+# - Store classification model and database configurations in an external settings file.
