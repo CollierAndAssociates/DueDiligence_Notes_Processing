@@ -21,6 +21,7 @@ from DD_Pseudonymization import pseudonymize
 from DD_Analytical_Processing import analyze_data
 from DD_Output_Storage import store_output
 from DD_Unpseudonymization import unpseudonymize
+import os
 
 def main():
     """
@@ -47,7 +48,8 @@ def main():
         store_processes()
     
     # Load interview notes dataset
-    data = load_data(r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\100-Unprocessed\interview_notes.xlsx")
+    data_file = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\100-Unprocessed\interview_notes.xlsx"
+    data = load_data(data_file)
 
     if data is None or data.empty:
         print("❌ Error: Data loading failed or file is empty.")
@@ -83,9 +85,10 @@ def main():
     print(pseudonymized_data.head())
 
     # Run analytical processing (sentiment analysis, core system analysis, IT recommendations)
-    analysis_results = analyze_data(pseudonymized_data)
+    output_file_path = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\800-Output\analysis_output.xlsx"
+    analysis_results = analyze_data(pseudonymized_data, output_file_path)
 
-    if not analysis_results or not any(analysis_results.values()):
+    if analysis_results is None or analysis_results.empty:
         print("❌ Error: Analytical processing failed. Skipping storage.")
         return
     print("\n✅ Analysis complete. Storing intermediate results.")
@@ -94,16 +97,23 @@ def main():
     storage_path = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\200-Storage/"
     store_output(analysis_results, storage_path)
 
-    # Unpseudonymize results for final output
-    final_results = unpseudonymize(analysis_results)
+    # Define the pseudonymization mapping file
+    mapping_file = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\Pseudonym_Mapping.json"
 
-    if not final_results or not any(final_results.values()):  # Fixed the incorrect `.empty` check
-        print("❌ Error: Unpseudonymization failed. Skipping final storage.")
+    # Define final output path
+    final_output_path = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\800-Output\final_analysis.xlsx"
+
+    # Ensure mapping file exists before unpseudonymization
+    if not os.path.exists(mapping_file):
+        print(f"❌ Error: Mapping file not found: {mapping_file}. Skipping unpseudonymization.")
         return
 
-    # Store final output report
-    final_output_path = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\800-Output/"
-    store_output(final_results, final_output_path)
+    # Unpseudonymize results for final output
+    final_results = unpseudonymize(analysis_results, mapping_file, final_output_path)
+
+    if final_results is None or final_results.empty:
+        print("❌ Error: Unpseudonymization failed. Skipping final storage.")
+        return
 
     print("\n✅ Final output stored successfully!")
 

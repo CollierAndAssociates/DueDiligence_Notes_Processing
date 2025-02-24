@@ -17,63 +17,51 @@ Usage Example:
     >>> unpseudonymized_data = unpseudonymize(pseudonymized_data)
     Data unpseudonymized successfully.
 """
-
-import json
+import pandas as pd
 import sqlite3
-import hashlib
-from typing import Any, Dict, Optional
+import os
+import json
+from typing import Optional
 
-def unpseudonymize(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def unpseudonymize(data: pd.DataFrame, mapping_file: str, output_path: str) -> Optional[pd.DataFrame]:
     """
-    Reverts pseudonymized data back to original terms using stored mappings.
+    Replaces pseudonymized terms with original values and saves as an Excel file.
 
     Args:
-        data (Dict[str, Any]): The dictionary containing pseudonymized data.
+        data (pd.DataFrame): The DataFrame with pseudonymized values.
+        mapping_file (str): Path to JSON file storing the mapping of pseudonyms to original values.
+        output_path (str): Path to save the final Excel file.
 
     Returns:
-        Optional[Dict[str, Any]]: The dictionary with unpseudonymized data, or None if an error occurs.
-
-    Raises:
-        sqlite3.Error: If there is an issue accessing the database.
-        json.JSONDecodeError: If JSON parsing fails.
-        Exception: Any unexpected error during processing.
-    
-    Example:
-        >>> unpseudonymized_data = unpseudonymize(pseudonymized_data)
-        Data unpseudonymized successfully.
+        Optional[pd.DataFrame]: The unpseudonymized DataFrame.
     """
     try:
-        # Establish connection to SQLite database
-        conn = sqlite3.connect('terms.db')
-        c = conn.cursor()
-        
-        # Retrieve stored terms for mapping
-        c.execute("SELECT term FROM terms")
-        terms = [row[0] for row in c.fetchall()]
-        conn.close()
-        
-        # Create a dictionary mapping hashed pseudonyms back to original terms
-        mapping = {hashlib.sha256(term.encode()).hexdigest()[:10]: term for term in terms}
-        
-        # Convert the data dictionary to a JSON string for string-based replacement
-        data_str = json.dumps(data)
-        
-        # Replace pseudonymized values with original terms
-        for pseudo, original in mapping.items():
-            data_str = data_str.replace(pseudo, original)
-        
-        # Convert back to dictionary format
-        unpseudo_data = json.loads(data_str)
-        
-        print("Data unpseudonymized successfully.")
-        return unpseudo_data
-    
-    except sqlite3.Error as e:
-        print(f"Database error during unpseudonymization: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        print(f"JSON parsing error during unpseudonymization: {e}")
-        return None
+        if not os.path.exists(mapping_file):
+            print(f"❌ Mapping file not found: {mapping_file}")
+            return None
+
+        # Load the pseudonym mapping
+        with open(mapping_file, "r", encoding="utf-8") as f:
+            pseudonym_map = json.load(f)
+
+        # Debugging: Print the first few mapping entries
+        print("🔍 Loaded pseudonym map:", list(pseudonym_map.items())[:5])
+
+        # Apply mapping to External Entity column
+        if "External Entity" in data.columns:
+            data["External Entity"] = data["External Entity"].map(pseudonym_map).fillna(data["External Entity"])
+
+        # Ensure output directory exists
+        output_dir = os.path.dirname(output_path)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        # Save the unpseudonymized DataFrame to an Excel file
+        data.to_excel(output_path, index=False)
+        print(f"✅ Unpseudonymized output saved to: {output_path}")
+
+        return data
+
     except Exception as e:
-        print(f"Unexpected error in unpseudonymization: {e}")
+        print(f"❌ Unexpected error in unpseudonymization: {e}")
         return None
