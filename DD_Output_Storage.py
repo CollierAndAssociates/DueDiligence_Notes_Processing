@@ -24,14 +24,15 @@ Usage Example:
 
 import json
 import os
-from typing import Any, Dict
+import pandas as pd
+from typing import Any, Dict, Union
 
-def store_output(data: Dict[str, Any], directory: str) -> None:
+def store_output(data: Union[Dict[str, Any], pd.DataFrame], directory: str) -> None:
     """
-    Stores output data securely in JSON format on the local drive.
+    Stores output data securely in JSON (for dictionaries) or CSV (for DataFrames) format.
 
     Args:
-        data (Dict[str, Any]): The structured data to be stored.
+        data (Union[Dict[str, Any], pd.DataFrame]): The structured data to be stored.
         directory (str): The directory path where the file will be saved.
 
     Returns:
@@ -45,26 +46,29 @@ def store_output(data: Dict[str, Any], directory: str) -> None:
         >>> store_output({"summary": "Processed data"}, "./storage/")
         Output stored at ./storage/analysis_output.json
     """
+    if data is None:
+        print("❌ Error: Attempted to save output, but data is None!")
+        return
+
     try:
         # Ensure the target directory exists, create it if necessary
         if not os.path.exists(directory):
             os.makedirs(directory)
         
-        # Define the file path for storing output data
-        file_path = os.path.join(directory, 'analysis_output.json')
-        
-        # Write the JSON data to the file with indentation for readability
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4)
-        
-        print(f"Output stored at {file_path}")
-    
+        # Handling DataFrame vs. Dictionary Storage
+        if isinstance(data, pd.DataFrame):
+            file_path = os.path.join(directory, 'analysis_output.csv')
+            data.to_csv(file_path, index=False)
+            print(f"✅ DataFrame output stored at {file_path}")
+        elif isinstance(data, dict):
+            file_path = os.path.join(directory, 'analysis_output.json')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4)
+            print(f"✅ Dictionary output stored at {file_path}")
+        else:
+            print("❌ Error: Unsupported data format for storage.")
+
     except OSError as e:
         print(f"Filesystem error while storing output: {e}")
     except Exception as e:
         print(f"Unexpected error storing output: {e}")
-
-# Suggested Improvements:
-# - Implement logging instead of print statements for better debugging and tracking.
-# - Allow file name customization instead of using a hardcoded 'analysis_output.json'.
-# - Consider adding compression (e.g., gzip) to reduce file size for large datasets.

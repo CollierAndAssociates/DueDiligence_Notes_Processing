@@ -21,19 +21,16 @@ Project Scope:
 
 Usage Example:
     >>> df, mapping = pseudonymize(df)
-    Pseudonymization complete.
-
-Configuration Steps:
-    - Ensure `terms.db` exists and contains terms to be pseudonymized.
-    - Run this script as part of the data processing pipeline before analysis.
+    ✅ Pseudonymization complete.
 """
 
 import pandas as pd
 import hashlib
 import sqlite3
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 
-def pseudonymize(data: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, str]]:
+
+def pseudonymize(data: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optional[Dict[str, str]]]:
     """
     Pseudonymizes sensitive terms and the 'External Entity' column using SHA-256 hashing.
 
@@ -41,7 +38,9 @@ def pseudonymize(data: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, str]]:
         data (pd.DataFrame): The dataset containing sensitive terms and entity names.
 
     Returns:
-        Tuple[pd.DataFrame, Dict[str, str]]: The pseudonymized DataFrame and a mapping for reversal.
+        Tuple[Optional[pd.DataFrame], Optional[Dict[str, str]]]: 
+            - The pseudonymized DataFrame.
+            - A mapping dictionary for later reversal.
 
     Raises:
         sqlite3.Error: If there is an issue accessing the terms database.
@@ -49,46 +48,93 @@ def pseudonymize(data: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, str]]:
 
     Example:
         >>> df, mapping = pseudonymize(df)
-        Pseudonymization complete.
+        ✅ Pseudonymization complete.
     """
     try:
-        # Connect to the SQLite database to retrieve stored terms
+        # 🛠️ Print initial dataset sample
+        print("\n🔍 Initial Data Sample (Before Pseudonymization):")
+        print(data.head())
+
+        # 🔍 Check if DataFrame has missing values BEFORE processing
+        print("\n🔍 Null Check BEFORE Pseudonymization:")
+        print(data.isnull().sum())
+
+        # Load stored terms from the database
         conn = sqlite3.connect('terms.db')
         c = conn.cursor()
         c.execute("SELECT term FROM terms")
         terms_to_pseudo = [row[0] for row in c.fetchall()]
         conn.close()
-        
+
         mapping: Dict[str, str] = {}
 
-        # Pseudonymize stored terms using SHA-256 hashing
+        print("\n🔍 Pseudonymizing Terms...")
+
+        # Pseudonymize stored terms using SHA-256 hashin
+        term_mapping = {}
         for term in terms_to_pseudo:
-            pseudo = hashlib.sha256(term.strip().encode()).hexdigest()[:10]
-            data.replace(term.strip(), pseudo, inplace=True)
-            mapping[pseudo] = term.strip()
+            if term and isinstance(term, (str, int, float)):  # Ensure it's a valid type
+                term_str = str(term).strip()  # Convert to string and remove whitespace
+                pseudo = hashlib.sha256(term_str.encode()).hexdigest()[:10]  # Generate 10-char hash
+                
+                # 🛠️ Debug: Print each term and its pseudonym
+                print(f"🔹 {term_str} -> {pseudo}")
+
+                #data.replace({term_str: pseudo}, inplace=True)  # Apply replacement correctly
+                #mapping[pseudo] = term_str  # Store mapping for unpseudonymization
+
+                term_mapping[term_str] = pseudo  # Store mapping for replacement
+                
+        # Apply pseudonym replacements
+        data = data.replace(term_mapping)
+        mapping.update(term_mapping)
+
+        # 🛠️ Print dataset sample after term pseudonymization
+        print("\n🔍 Data Sample After Term Pseudonymization:")
+        print(data.head())
 
         # Ensure 'External Entity' column exists before processing
         if 'External Entity' not in data.columns:
-            raise KeyError("Missing required column: 'External Entity'")
+            print("⚠️ Warning: 'External Entity' column missing. Skipping entity pseudonymization.")
+        else:
+            print("\n🔍 Pseudonymizing External Entities...")
 
-        # Pseudonymize unique entities in the 'External Entity' column
-        for entity in data['External Entity'].unique():
-            pseudo = hashlib.sha256(entity.encode()).hexdigest()[:10]
-            data['External Entity'].replace(entity, pseudo, inplace=True)
-            mapping[pseudo] = entity
+            # Pseudonymize unique entities in 'External Entity' column
+            entity_mapping = {}
+            for entity in data['External Entity'].dropna().unique():
+                if isinstance(entity, (str, int, float)):  # Ensure it's a valid type
+                    entity_str = str(entity).strip()  # Convert to string
+                    if entity_str:  # Avoid empty strings
+                        pseudo = hashlib.sha256(entity_str.encode()).hexdigest()[:10]
 
-        print("Pseudonymization complete.")
+                        # 🛠️ Debug: Print each entity and its pseudonym
+                        print(f"🔹 {entity_str} -> {pseudo}")
+
+                        entity_mapping[entity_str] = pseudo  # Store mapping
+
+            # Apply the replacement correctly using `.replace({})`
+            data['External Entity'] = data['External Entity'].replace(entity_mapping)
+            mapping.update(entity_mapping)  # Add entity mappings to global mapping
+
+        # 🛠️ Print dataset sample after full pseudonymization
+        print("\n🔍 Final Data Sample (After Full Pseudonymization):")
+        print(data.head())
+
+        print("\n✅ Pseudonymization complete.")
+        print("\n🔍 Data After Pseudonymization:")
+        print(data.head())
         return data, mapping
-    
+
     except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        print(f"❌ Database error: {e}")
         return None, None
     except KeyError as e:
-        print(f"Data error: {e}")
+        print(f"❌ Data error: {e}")
         return None, None
     except Exception as e:
-        print(f"Unexpected error in pseudonymization: {e}")
+        print(f"❌ Unexpected error in pseudonymization: {e}")
         return None, None
+
 
 # Suggested Improvements:
 # - Allow configuration of hash length for different security needs.

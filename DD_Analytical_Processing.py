@@ -37,43 +37,42 @@ def analyze_data(data: pd.DataFrame) -> Optional[Dict[str, Any]]:
     Returns:
         Optional[Dict[str, Any]]: A dictionary containing overall summaries and sentiment analysis results.
         Returns None in case of an error.
-
-    Raises:
-        KeyError: If expected columns are missing from the dataset.
-        ValueError: If data contains unexpected or non-textual values.
-
-    Example:
-        >>> results = analyze_data(df)
-        Analytical processing complete.
     """
     results = {}
+
     try:
+        if data is None or data.empty:
+            print("❌ No data available for analysis. Skipping analytical processing.")
+            return None
+
+        print("\n✅ Analyzing Data...")
+        print("Columns Available:", data.columns.tolist())
+
+        # Ensure required columns exist
+        required_columns = ['Notes']
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            print(f"❌ Error: Missing columns {missing_columns}. Skipping analysis.")
+            return None
+
         # Generate overall summary statistics
         results['overall_summary'] = data.describe(include='all').to_dict()
 
         # Sentiment Analysis: Assign a sentiment score to each note entry
         data['Sentiment'] = data['Notes'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
-        
+
         # Compute average sentiment across the dataset
         results['sentiment_overall'] = data['Sentiment'].mean()
-        
-        # Compute sentiment scores grouped by interview categories
-        results['sentiment_by_category'] = data.groupby('Interview Category')['Sentiment'].mean().to_dict()
 
-        print("Analytical processing complete.")
+        # Compute sentiment scores grouped by interview categories (if available)
+        if 'Interview Category' in data.columns:
+            results['sentiment_by_category'] = data.groupby('Interview Category')['Sentiment'].mean().to_dict()
+        else:
+            print("⚠️ Warning: 'Interview Category' column missing. Skipping grouped sentiment analysis.")
+
+        print("\n✅ Analytical processing complete.")
         return results
-    
-    except KeyError as e:
-        print(f"Data error: Missing column {e}")
-        return None
-    except ValueError as e:
-        print(f"Value error: {e}")
-        return None
-    except Exception as e:
-        print(f"Unexpected error in analytical processing: {e}")
-        return None
 
-# Suggested Improvements:
-# - Consider using more advanced NLP models like VADER or Hugging Face transformers for sentiment analysis.
-# - Implement error handling for edge cases where notes contain unexpected formats.
-# - Cache or preprocess text data to optimize performance for large datasets.
+    except Exception as e:
+        print(f"❌ Unexpected error in analytical processing: {e}")
+        return None

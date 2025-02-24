@@ -1,5 +1,5 @@
 """
-Data_Ingestion.py
+DD_Data_Ingestion.py
 
 This module is responsible for loading data from an Excel spreadsheet into a Pandas DataFrame.
 It ensures efficient data ingestion while handling potential errors gracefully.
@@ -38,7 +38,25 @@ def load_data(file_path: str) -> pd.DataFrame:
     """
     try:
         # Attempt to load data from an Excel file using pandas
-        data = pd.read_excel(file_path)
+        # 🔍 Load dataset
+        if file_path.endswith(".csv"):
+            data = pd.read_csv(file_path)
+        elif file_path.endswith(".xlsx"):
+            data = pd.read_excel(file_path)
+        else:
+            raise ValueError("Unsupported file format. Must be .csv or .xlsx")
+
+        # 🔍 Debug: Check initial dataset shape
+        print(f"\n✅ Data loaded successfully. Shape: {data.shape}")
+
+        # 🔍 Debug: Check missing values at the beginning
+        print("\n🔍 Null Check AFTER Data Load:")
+        print(data.isnull().sum())
+
+        # 🔍 Debug: Print first few rows
+        print("\n🔍 Sample Data (First 5 Rows After Load):")
+        print(data.head())
+
         print("Data loaded successfully.")
         return data
     except FileNotFoundError:
