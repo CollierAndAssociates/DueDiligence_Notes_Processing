@@ -98,18 +98,18 @@ def main():
     store_output(analysis_results, storage_path)
 
     # Define the pseudonymization mapping file
-    mapping_file = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\Pseudonym_Mapping.json"
+    #mapping_file = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\Pseudonym_Mapping.json"
 
     # Define final output path
     final_output_path = r"C:\Users\andy\OneDrive - Collier & Associates\CA-Code\Repositories_Files\DueDiligence_Notes_Processing_Files\Files\800-Output\final_analysis.xlsx"
 
     # Ensure mapping file exists before unpseudonymization
-    if not os.path.exists(mapping_file):
-        print(f"❌ Error: Mapping file not found: {mapping_file}. Skipping unpseudonymization.")
-        return
+    #if not os.path.exists(mapping_file):
+        #print(f"❌ Error: Mapping file not found: {mapping_file}. Skipping unpseudonymization.")
+        #return
 
     # Unpseudonymize results for final output
-    final_results = unpseudonymize(analysis_results, mapping_file, final_output_path)
+    final_results = unpseudonymize(analysis_results, final_output_path)
 
     if final_results is None or final_results.empty:
         print("❌ Error: Unpseudonymization failed. Skipping final storage.")

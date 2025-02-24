@@ -20,36 +20,35 @@ Usage Example:
 import pandas as pd
 import sqlite3
 import os
-import json
 from typing import Optional
 
-def unpseudonymize(data: pd.DataFrame, mapping_file: str, output_path: str) -> Optional[pd.DataFrame]:
+def unpseudonymize(data: pd.DataFrame, output_path: str) -> Optional[pd.DataFrame]:
     """
-    Replaces pseudonymized terms with original values and saves as an Excel file.
+    Replaces pseudonymized terms with original values using SQLite and saves as an Excel file.
 
     Args:
         data (pd.DataFrame): The DataFrame with pseudonymized values.
-        mapping_file (str): Path to JSON file storing the mapping of pseudonyms to original values.
         output_path (str): Path to save the final Excel file.
 
     Returns:
         Optional[pd.DataFrame]: The unpseudonymized DataFrame.
     """
     try:
-        if not os.path.exists(mapping_file):
-            print(f"❌ Mapping file not found: {mapping_file}")
-            return None
+        # Connect to SQLite database
+        conn = sqlite3.connect('terms.db')
+        c = conn.cursor()
 
-        # Load the pseudonym mapping
-        with open(mapping_file, "r", encoding="utf-8") as f:
-            pseudonym_map = json.load(f)
+        # Load the pseudonym mappings from SQLite
+        c.execute("SELECT original, pseudonym FROM pseudonym_mapping")
+        pseudonym_map = {row[1]: row[0] for row in c.fetchall()}  # {hashed_value: original_term}
 
-        # Debugging: Print the first few mapping entries
-        print("🔍 Loaded pseudonym map:", list(pseudonym_map.items())[:5])
+        conn.close()
+
+        print("🔍 Loaded pseudonym map:", list(pseudonym_map.items())[:5])  # Debugging
 
         # Apply mapping to External Entity column
         if "External Entity" in data.columns:
-            data["External Entity"] = data["External Entity"].map(pseudonym_map).fillna(data["External Entity"])
+            data["External Entity"] = data["External Entity"].replace(pseudonym_map)
 
         # Ensure output directory exists
         output_dir = os.path.dirname(output_path)

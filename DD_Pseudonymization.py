@@ -32,7 +32,7 @@ from typing import Tuple, Dict, Optional
 
 def pseudonymize(data: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optional[Dict[str, str]]]:
     """
-    Pseudonymizes sensitive terms and the 'External Entity' column using SHA-256 hashing.
+    Pseudonymizes sensitive terms and the 'External Entity' column using SHA-256 hashing and stores the mapping.
 
     Args:
         data (pd.DataFrame): The dataset containing sensitive terms and entity names.
@@ -45,84 +45,70 @@ def pseudonymize(data: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optional[D
     Raises:
         sqlite3.Error: If there is an issue accessing the terms database.
         KeyError: If the 'External Entity' column is missing from the dataset.
-
-    Example:
-        >>> df, mapping = pseudonymize(df)
-        ✅ Pseudonymization complete.
     """
     try:
-        # 🛠️ Print initial dataset sample
         print("\n🔍 Initial Data Sample (Before Pseudonymization):")
         print(data.head())
 
-        # 🔍 Check if DataFrame has missing values BEFORE processing
-        print("\n🔍 Null Check BEFORE Pseudonymization:")
-        print(data.isnull().sum())
-
-        # Load stored terms from the database
+        # Connect to SQLite and ensure mapping table exists
         conn = sqlite3.connect('terms.db')
         c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS pseudonym_mapping (
+                original TEXT PRIMARY KEY,
+                pseudonym TEXT UNIQUE
+            )
+        """)
+        conn.commit()
+
+        # Load stored terms from the database
         c.execute("SELECT term FROM terms")
         terms_to_pseudo = [row[0] for row in c.fetchall()]
-        conn.close()
 
         mapping: Dict[str, str] = {}
 
         print("\n🔍 Pseudonymizing Terms...")
 
-        # Pseudonymize stored terms using SHA-256 hashin
+        # Pseudonymize stored terms using SHA-256 hashing
         term_mapping = {}
         for term in terms_to_pseudo:
             if term and isinstance(term, (str, int, float)):  # Ensure it's a valid type
                 term_str = str(term).strip()  # Convert to string and remove whitespace
                 pseudo = hashlib.sha256(term_str.encode()).hexdigest()[:10]  # Generate 10-char hash
                 
-                # 🛠️ Debug: Print each term and its pseudonym
-                print(f"🔹 {term_str} -> {pseudo}")
+                print(f"🔹 {term_str} -> {pseudo}")  # Debugging
 
-                #data.replace({term_str: pseudo}, inplace=True)  # Apply replacement correctly
-                #mapping[pseudo] = term_str  # Store mapping for unpseudonymization
+                term_mapping[term_str] = pseudo  # Store mapping
+                mapping[pseudo] = term_str  # For reverse lookup
 
-                term_mapping[term_str] = pseudo  # Store mapping for replacement
-                
+                # Store mapping in the database
+                c.execute("INSERT OR IGNORE INTO pseudonym_mapping (original, pseudonym) VALUES (?, ?)", (term_str, pseudo))
+
         # Apply pseudonym replacements
         data = data.replace(term_mapping)
-        mapping.update(term_mapping)
 
-        # 🛠️ Print dataset sample after term pseudonymization
-        print("\n🔍 Data Sample After Term Pseudonymization:")
-        print(data.head())
-
-        # Ensure 'External Entity' column exists before processing
-        if 'External Entity' not in data.columns:
-            print("⚠️ Warning: 'External Entity' column missing. Skipping entity pseudonymization.")
-        else:
+        # Pseudonymize External Entities
+        if 'External Entity' in data.columns:
             print("\n🔍 Pseudonymizing External Entities...")
-
-            # Pseudonymize unique entities in 'External Entity' column
             entity_mapping = {}
             for entity in data['External Entity'].dropna().unique():
-                if isinstance(entity, (str, int, float)):  # Ensure it's a valid type
-                    entity_str = str(entity).strip()  # Convert to string
-                    if entity_str:  # Avoid empty strings
-                        pseudo = hashlib.sha256(entity_str.encode()).hexdigest()[:10]
+                entity_str = str(entity).strip()
+                if entity_str:
+                    pseudo = hashlib.sha256(entity_str.encode()).hexdigest()[:10]
+                    print(f"🔹 {entity_str} -> {pseudo}")  # Debugging
 
-                        # 🛠️ Debug: Print each entity and its pseudonym
-                        print(f"🔹 {entity_str} -> {pseudo}")
+                    entity_mapping[entity_str] = pseudo
+                    mapping[pseudo] = entity_str  # For reverse lookup
 
-                        entity_mapping[entity_str] = pseudo  # Store mapping
+                    # Store mapping in the database
+                    c.execute("INSERT OR IGNORE INTO pseudonym_mapping (original, pseudonym) VALUES (?, ?)", (entity_str, pseudo))
 
-            # Apply the replacement correctly using `.replace({})`
             data['External Entity'] = data['External Entity'].replace(entity_mapping)
-            mapping.update(entity_mapping)  # Add entity mappings to global mapping
 
-        # 🛠️ Print dataset sample after full pseudonymization
-        print("\n🔍 Final Data Sample (After Full Pseudonymization):")
-        print(data.head())
+        conn.commit()  # Ensure changes are saved
+        conn.close()  # Close connection
 
         print("\n✅ Pseudonymization complete.")
-        print("\n🔍 Data After Pseudonymization:")
-        print(data.head())
         return data, mapping
 
     except sqlite3.Error as e:
