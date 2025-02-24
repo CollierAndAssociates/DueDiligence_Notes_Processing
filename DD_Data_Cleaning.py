@@ -38,6 +38,7 @@ import torch
 from transformers import pipeline
 from joblib import Parallel, delayed
 from typing import Optional
+from datasets import Dataset
 
 def clean_and_prepare(data: pd.DataFrame) -> Optional[pd.DataFrame]:
     """
@@ -100,7 +101,17 @@ def clean_and_prepare(data: pd.DataFrame) -> Optional[pd.DataFrame]:
 
         # Batch classify Core Process
         if process_texts:
-            process_results = classifier(process_texts, core_processes, batch_size=8)
+            #process_results = classifier(process_texts, core_processes, batch_size=8)
+            # Convert DataFrame to Hugging Face Dataset for efficient processing
+            hf_dataset = Dataset.from_pandas(data[['Notes', 'Core Process']].dropna())
+
+            # Run classification in batches for efficiency
+            batch_size = 8  # Adjust this based on GPU memory
+            results = classifier(hf_dataset['Notes'].tolist(), core_processes, batch_size=batch_size)
+
+            # Assign the predicted labels back to the DataFrame
+            data.loc[process_indices, 'Core Process'] = [res['labels'][0] for res in results]
+
             for idx, result in zip(process_indices, process_results):
                 data.at[idx, 'Core Process'] = result['labels'][0]
 
@@ -111,7 +122,8 @@ def clean_and_prepare(data: pd.DataFrame) -> Optional[pd.DataFrame]:
             return result['labels'][0]
 
         if system_texts:
-            system_results = Parallel(n_jobs=4)(delayed(classify_system)(notes, candidates) 
+            #system_results = Parallel(n_jobs=4)(delayed(classify_system)(notes, candidates) 
+            system_results = Parallel(n_jobs=2, backend="loky")(delayed(classify_system)(notes, candidates) 
                                                 for notes, candidates in zip(system_texts, system_candidates))
             
             for idx, result in zip(system_indices, system_results):
